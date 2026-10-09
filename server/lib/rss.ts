@@ -18,13 +18,22 @@ export interface ParsedFeed {
 
 type Any = Record<string, unknown>;
 
+const MAX_DURATION_SEC = 7 * 24 * 3600;
+
 function text(v: unknown): string | null {
   if (v == null) return null;
   if (typeof v === "string") return v.trim() || null;
   if (typeof v === "number") return String(v);
-  if (Array.isArray(v)) return text(v[0]);
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      const t = text(x);
+      if (t) return t;
+    }
+    return null;
+  }
   if (typeof v === "object") {
     const o = v as Any;
+    if ("#cdata" in o) return text(o["#cdata"]);
     if ("#text" in o) return text(o["#text"]);
     if ("@_href" in o) return text(o["@_href"]);
     if ("@_url" in o) return text(o["@_url"]);
@@ -39,15 +48,24 @@ function attr(v: unknown, name: string): string | null {
   return null;
 }
 
+const asList = (v: unknown): Any[] =>
+  v == null ? [] : (Array.isArray(v) ? v : [v]).filter((x): x is Any => !!x && typeof x === "object");
+
+/** Accepts "3600", "45.5", "mm:ss", "h:mm:ss" (and "h:mm:ss.s"). Rejects negatives, >3 parts, and absurd values. */
 export function parseDuration(v: unknown): number | null {
   const s = text(v);
   if (!s) return null;
-  if (/^\d+(\.\d+)?$/.test(s)) return Math.round(Number(s));
-  const parts = s.split(":").map((p) => Number(p));
-  if (parts.some((n) => Number.isNaN(n))) return null;
-  let sec = 0;
-  for (const p of parts) sec = sec * 60 + p;
-  return Math.round(sec);
+  let sec: number;
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    sec = Number(s);
+  } else {
+    const parts = s.split(":");
+    if (parts.length > 3 || !parts.every((p) => /^\d+(\.\d+)?$/.test(p.trim()))) return null;
+    sec = 0;
+    for (const p of parts) sec = sec * 60 + Number(p);
+  }
+  sec = Math.round(sec);
+  return sec >= 0 && sec <= MAX_DURATION_SEC ? sec : null;
 }
 
 function toIso(v: unknown): string | null {
@@ -57,7 +75,37 @@ function toIso(v: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-export function parseFeedXml(xml: string): ParsedFeed {
+/** Resolves a possibly relative URL against the feed URL; null when it is not an http(s) URL. */
+function resolveUrl(raw: string | null, base: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw, base);
+    return /^https?:$/.test(u.protocol) ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+const isAudioType = (type: string | null): boolean => !!type && /^audio\//i.test(type);
+
+/** Picks the audio URL of an item: enclosure, then audio media:content, then Atom link rel=enclosure. */
+function pickAudio(it: Any): string | null {
+  const enclosures = asList(it.enclosure);
+  const audioEnclosure = enclosures.find((e) => isAudioType(attr(e, "type")));
+  const anyEnclosure = enclosures.find((e) => attr(e, "url") && !/^(image|video)\//i.test(attr(e, "type") ?? ""));
+  const media = asList(it["media:content"]);
+  const audioMedia = media.find((m) => isAudioType(attr(m, "type")) || attr(m, "medium") === "audio");
+  const atomLink = asList(it.link).find((l) => attr(l, "rel") === "enclosure" && (isAudioType(attr(l, "type")) || !attr(l, "type")));
+  return (
+    attr(audioEnclosure, "url") ??
+    attr(anyEnclosure, "url") ??
+    attr(audioMedia, "url") ??
+    attr(atomLink, "href") ??
+    null
+  );
+}
+
+export function parseFeedXml(xml: string, feedUrl?: string): ParsedFeed {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
@@ -67,37 +115,32 @@ export function parseFeedXml(xml: string): ParsedFeed {
     parseTagValue: false,
   });
   const doc = parser.parse(xml) as Any;
-  const channel = ((doc.rss as Any)?.channel ?? doc.channel ?? (doc.feed as Any)) as Any | undefined;
+  const rdf = doc["rdf:RDF"] as Any | undefined;
+  const channel = ((doc.rss as Any)?.channel ?? doc.channel ?? (doc.feed as Any) ?? rdf?.channel) as Any | undefined;
   if (!channel) throw new Error("not an RSS feed");
 
-  const cdataOrText = (v: unknown): string | null => {
-    if (v && typeof v === "object" && !Array.isArray(v) && "#cdata" in (v as Any)) {
-      return text((v as Any)["#cdata"]);
-    }
-    return text(v);
-  };
-
   const feedImage =
-    attr(channel["itunes:image"], "href") ?? text((channel.image as Any)?.url) ?? null;
+    resolveUrl(attr(channel["itunes:image"], "href") ?? text((channel.image as Any)?.url), feedUrl) ?? null;
 
-  const rawItems = channel.item ?? channel.entry ?? [];
+  // RSS 2.0: channel.item; Atom: feed.entry; RSS 1.0: rdf:RDF.item (siblings of channel).
+  const rawItems = channel.item ?? channel.entry ?? rdf?.item ?? [];
   const items = (Array.isArray(rawItems) ? rawItems : [rawItems]) as Any[];
   const episodes: ParsedEpisode[] = [];
   for (const it of items) {
-    const audio = attr(it.enclosure, "url") ?? attr(it["media:content"], "url");
-    const title = cdataOrText(it.title) ?? "(untitled)";
-    const guid = cdataOrText(it.guid) ?? audio ?? title;
+    const audio = resolveUrl(pickAudio(it), feedUrl);
+    const title = text(it.title) ?? "(untitled)";
+    const guid = text(it.guid) ?? text(it.id) ?? audio ?? title;
     episodes.push({
       guid,
       title,
-      description: cdataOrText(it["itunes:summary"]) ?? cdataOrText(it.description) ?? null,
+      description: text(it["itunes:summary"]) ?? text(it.description) ?? text(it.summary) ?? null,
       audio_url: audio,
-      image_url: attr(it["itunes:image"], "href") ?? feedImage,
+      image_url: resolveUrl(attr(it["itunes:image"], "href"), feedUrl) ?? feedImage,
       duration_sec: parseDuration(it["itunes:duration"]),
-      published_at: toIso(it.pubDate) ?? toIso(it.published) ?? null,
+      published_at: toIso(it.pubDate) ?? toIso(it.published) ?? toIso(it.updated) ?? toIso(it["dc:date"]) ?? null,
     });
   }
-  return { title: cdataOrText(channel.title), image_url: feedImage, episodes };
+  return { title: text(channel.title), image_url: feedImage, episodes };
 }
 
 export async function fetchFeed(url: string): Promise<ParsedFeed> {
@@ -107,5 +150,6 @@ export async function fetchFeed(url: string): Promise<ParsedFeed> {
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`feed fetch failed: HTTP ${res.status}`);
-  return parseFeedXml(await res.text());
+  // Resolve relative URLs against the final URL after redirects.
+  return parseFeedXml(await res.text(), res.url || url);
 }

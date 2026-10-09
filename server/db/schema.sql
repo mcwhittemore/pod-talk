@@ -1,5 +1,4 @@
 -- Pod Talk schema. Idempotent: safe to re-run.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS feeds (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -36,6 +35,8 @@ CREATE TABLE IF NOT EXISTS queue_items (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS queue_items_audio_url_idx ON queue_items (audio_url);
+-- Uploads are idempotent on audio_url (see lib/queue.ts addUploadToQueue).
+CREATE UNIQUE INDEX IF NOT EXISTS queue_items_upload_url_uidx ON queue_items (audio_url) WHERE source = 'upload';
 
 CREATE TABLE IF NOT EXISTS transcripts (
   queue_item_id uuid PRIMARY KEY REFERENCES queue_items(id) ON DELETE CASCADE,

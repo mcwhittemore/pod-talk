@@ -62,7 +62,7 @@ export async function enqueueEpisodeAction(formData: FormData) {
   const feedId = String(formData.get("feed_id") ?? "");
   if (isUuid(episodeId)) {
     const item = await addEpisodeToQueue(episodeId);
-    if (item) await emit("queue.item.added", item);
+    if (item) emit("queue.item.added", item);
   }
   revalidatePath("/");
   if (isUuid(feedId)) revalidatePath(`/feeds/${feedId}`);

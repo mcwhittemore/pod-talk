@@ -50,6 +50,16 @@ step "POST /api/queue again is idempotent (200)" 200 -X POST -H "$AUTH" -H "$JSO
 step "GET /api/queue" 200 -H "$AUTH" "$BASE/api/queue"
 step "PATCH /api/queue/:id status=downloaded" 200 -X PATCH -H "$AUTH" -H "$JSON" -d '{"status":"downloaded","duration_ms":10000}' "$BASE/api/queue/$QID"
 
+echo "-- validation (must be 400, never 500)"
+step "PATCH /api/queue/:id duration_ms=1.5 -> 400" 400 -X PATCH -H "$AUTH" -H "$JSON" -d '{"duration_ms":1.5}' "$BASE/api/queue/$QID"
+step "PATCH /api/queue/:id duration_ms=1e12 -> 400" 400 -X PATCH -H "$AUTH" -H "$JSON" -d '{"duration_ms":1e12}' "$BASE/api/queue/$QID"
+step "PUT transcript duration_ms=-5 -> 400" 400 -X PUT -H "$AUTH" -H "$JSON" -d '{"duration_ms":-5,"segments":[]}' "$BASE/api/queue/$QID/transcript"
+step "PUT transcript end<start -> 400" 400 -X PUT -H "$AUTH" -H "$JSON" -d '{"segments":[{"start_ms":10,"end_ms":5,"text":"x"}]}' "$BASE/api/queue/$QID/transcript"
+step "POST /api/queue malformed percent URL -> 201 (title falls back to raw segment)" "200|201" -X POST -H "$AUTH" -H "$JSON" \
+  -d '{"audio_url":"https://example.com/smoke-%E0%A4%A.mp3"}' "$BASE/api/queue"
+BAD_QID=$(printf '%s' "$BODY" | jget id)
+[[ -n "$BAD_QID" ]] && step "DELETE malformed-percent item" 200 -X DELETE -H "$AUTH" "$BASE/api/queue/$BAD_QID"
+
 echo "-- transcript"
 step "PUT /api/queue/:id/transcript (3 segments)" 200 -X PUT -H "$AUTH" -H "$JSON" -d '{
   "engine":"whisper.cpp/base.en","duration_ms":10000,
@@ -71,6 +81,9 @@ step "POST /api/conversations" 201 -X POST -H "$AUTH" -H "$JSON" -d "{\"queue_it
 CID=$(printf '%s' "$BODY" | jget id)
 echo "     conversation $CID"
 step "POST events paused" 200 -X POST -H "$AUTH" -H "$JSON" -d '{"type":"paused","audio_position_ms":4100}' "$BASE/api/conversations/$CID/events"
+step "POST events type=constructor -> 400" 400 -X POST -H "$AUTH" -H "$JSON" -d '{"type":"constructor"}' "$BASE/api/conversations/$CID/events"
+step "POST turn audio_position_ms=1e12 -> 400" 400 -X POST -H "$AUTH" -H "$JSON" -d '{"role":"user","text":"hi","audio_position_ms":1e12}' "$BASE/api/conversations/$CID/turns"
+step "POST /api/conversations audio_position_ms=1.5 -> 400" 400 -X POST -H "$AUTH" -H "$JSON" -d "{\"queue_item_id\":\"$QID\",\"audio_position_ms\":1.5}" "$BASE/api/conversations"
 step "POST turn user" 201 -X POST -H "$AUTH" -H "$JSON" -d '{"role":"user","text":"What does domestic tranquility mean here?","audio_position_ms":4100,"segment_start_ms":3200,"segment_end_ms":6800,"context_excerpt":"establish Justice, insure domestic Tranquility","engine":"whisper.cpp/base.en"}' "$BASE/api/conversations/$CID/turns"
 step "POST turn assistant" 201 -X POST -H "$AUTH" -H "$JSON" -d '{"role":"assistant","text":"It refers to peace and order within the country, one of the goals the preamble lists for the new government.","audio_position_ms":4100,"segment_start_ms":3200,"segment_end_ms":6800,"engine":"bm25"}' "$BASE/api/conversations/$CID/turns"
 step "POST events resumed" 200 -X POST -H "$AUTH" -H "$JSON" -d '{"type":"resumed","audio_position_ms":4100}' "$BASE/api/conversations/$CID/events"

@@ -2,7 +2,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { requireAuth } from "@/lib/auth";
 import { json } from "@/lib/http";
 import { addUploadToQueue } from "@/lib/queue";
-import { emit } from "@/lib/webhooks";
+import { emitAndWait } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
           /* ignore */
         }
         const { item, created } = await addUploadToQueue(blob.url, title);
-        if (item && created) await emit("queue.item.added", item);
+        if (item && created) await emitAndWait("queue.item.added", item);
       },
     });
     return json(result);

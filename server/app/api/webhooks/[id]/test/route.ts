@@ -16,10 +16,7 @@ export async function POST(req: Request, { params }: Ctx) {
     [id],
   );
   if (!hook) return notFound();
-  await deliver(hook, "webhook.test", { message: "Hello from Pod Talk", webhook_id: hook.id });
-  const delivery = await one(
-    "SELECT id, event, status_code, ok, error, created_at FROM webhook_deliveries WHERE webhook_id = $1 ORDER BY created_at DESC LIMIT 1",
-    [id],
-  );
-  return json({ ok: delivery ? (delivery as { ok: boolean }).ok : false, delivery });
+  // Awaited on purpose: the caller wants this delivery's result.
+  const delivery = await deliver(hook, "webhook.test", { message: "Hello from Pod Talk", webhook_id: hook.id });
+  return json({ ok: delivery?.ok ?? false, delivery });
 }

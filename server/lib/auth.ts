@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 
 export const COOKIE_NAME = "pt_token";
 
@@ -10,7 +11,10 @@ function expectedToken(): string {
 
 export function tokenMatches(token: string | undefined | null): boolean {
   const expected = expectedToken();
-  return Boolean(expected) && token === expected;
+  if (!expected || typeof token !== "string") return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function readCookie(req: Request, name: string): string | undefined {

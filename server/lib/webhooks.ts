@@ -1,5 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { query } from "./db";
+import { waitUntil } from "@vercel/functions";
+import { one, query } from "./db";
 
 export const WEBHOOK_EVENTS = [
   "queue.item.added",
@@ -22,11 +23,21 @@ interface WebhookRow {
   active: boolean;
 }
 
+export interface DeliveryRow {
+  id: string;
+  event: string;
+  status_code: number | null;
+  ok: boolean;
+  error: string | null;
+  created_at: string;
+}
+
 export function sign(secret: string, body: string): string {
   return "sha256=" + createHmac("sha256", secret).update(body).digest("hex");
 }
 
-export async function deliver(hook: WebhookRow, event: WebhookEvent, data: unknown): Promise<void> {
+/** POSTs one event to one webhook and logs the result. Returns the webhook_deliveries row. */
+export async function deliver(hook: WebhookRow, event: WebhookEvent, data: unknown): Promise<DeliveryRow | null> {
   const payload = { id: randomUUID(), event, created_at: new Date().toISOString(), data };
   const body = JSON.stringify(payload);
   let statusCode: number | null = null;
@@ -54,15 +65,15 @@ export async function deliver(hook: WebhookRow, event: WebhookEvent, data: unkno
   } finally {
     clearTimeout(timer);
   }
-  await query(
+  return one<DeliveryRow>(
     `INSERT INTO webhook_deliveries (webhook_id, event, payload, status_code, ok, error)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, event, status_code, ok, error, created_at`,
     [hook.id, event, body, statusCode, ok, error],
   );
 }
 
-/** Deliver an event to every active webhook subscribed to it. Never throws. */
-export async function emit(event: WebhookEvent, data: unknown): Promise<void> {
+/** Deliver an event to every active webhook subscribed to it and wait for the results. Never throws. */
+export async function emitAndWait(event: WebhookEvent, data: unknown): Promise<void> {
   try {
     const hooks = await query<WebhookRow>(
       `SELECT id, url, secret, events, active FROM webhooks
@@ -72,5 +83,18 @@ export async function emit(event: WebhookEvent, data: unknown): Promise<void> {
     await Promise.all(hooks.map((h) => deliver(h, event, data)));
   } catch (e) {
     console.error("webhook emit failed", event, e);
+  }
+}
+
+/**
+ * Deliver an event without blocking the request. On Vercel, `waitUntil` keeps the function alive
+ * until delivery finishes; elsewhere (next dev) it is a no-op and the promise simply runs detached.
+ */
+export function emit(event: WebhookEvent, data: unknown): void {
+  const p = emitAndWait(event, data).catch((e) => console.error("webhook emit failed", event, e));
+  try {
+    waitUntil(p);
+  } catch {
+    /* no request context (e.g. local dev); the promise still runs */
   }
 }

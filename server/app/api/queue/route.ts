@@ -5,6 +5,15 @@ import { emit } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
+function titleFromUrl(url: URL): string {
+  const last = url.pathname.split("/").pop() || "Upload";
+  try {
+    return decodeURIComponent(last) || "Upload";
+  } catch {
+    return last; // malformed percent-encoding: keep the raw segment
+  }
+}
+
 export async function GET(req: Request) {
   const denied = requireAuth(req);
   if (denied) return denied;
@@ -21,7 +30,7 @@ export async function POST(req: Request) {
     if (!isUuid(body.episode_id)) return badRequest("episode_id must be a uuid");
     const item = await addEpisodeToQueue(body.episode_id);
     if (!item) return badRequest("episode not found or has no audio");
-    await emit("queue.item.added", item);
+    emit("queue.item.added", item);
     return json(item, 201);
   }
 
@@ -33,10 +42,10 @@ export async function POST(req: Request) {
       return badRequest("audio_url must be a valid URL");
     }
     if (!/^https?:$/.test(url.protocol)) return badRequest("audio_url must be http(s)");
-    const title = (body.title ?? "").trim() || decodeURIComponent(url.pathname.split("/").pop() || "Upload");
+    const title = (typeof body.title === "string" ? body.title : "").trim() || titleFromUrl(url);
     const { item, created } = await addUploadToQueue(url.toString(), title);
     if (!item) return badRequest("could not create item");
-    if (created) await emit("queue.item.added", item);
+    if (created) emit("queue.item.added", item);
     return json(item, created ? 201 : 200);
   }
 

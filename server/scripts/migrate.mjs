@@ -30,7 +30,8 @@ if (!url) {
   process.exit(1);
 }
 const isLocal = /localhost|127\.0\.0\.1/.test(url);
-const pool = new pg.Pool({ connectionString: url, ssl: isLocal ? undefined : { rejectUnauthorized: false } });
+const ssl = isLocal ? undefined : process.env.PGSSL_INSECURE === "1" ? { rejectUnauthorized: false } : true;
+const pool = new pg.Pool({ connectionString: url, ssl });
 const sql = readFileSync(join(root, "db", "schema.sql"), "utf8");
 try {
   await pool.query(sql);

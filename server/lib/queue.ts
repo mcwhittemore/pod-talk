@@ -1,4 +1,5 @@
 import { query, one } from "./db";
+import { int32 } from "./http";
 
 export interface QueueItem {
   id: string;
@@ -32,6 +33,9 @@ const SELECT = `
   LEFT JOIN episodes e ON e.id = q.episode_id
   LEFT JOIN feeds f ON f.id = e.feed_id`;
 
+// Computed inside the INSERT so concurrent adds cannot read the same MAX(position).
+const NEXT_POSITION = "(SELECT COALESCE(MAX(position), 0) + 1 FROM queue_items)";
+
 export async function listQueue(): Promise<QueueItem[]> {
   return query<QueueItem>(`${SELECT} ORDER BY q.position ASC, q.created_at ASC`);
 }
@@ -40,35 +44,38 @@ export async function getQueueItem(id: string): Promise<QueueItem | null> {
   return one<QueueItem>(`${SELECT} WHERE q.id = $1`, [id]);
 }
 
-async function nextPosition(): Promise<number> {
-  const row = await one<{ next: number }>("SELECT COALESCE(MAX(position), 0) + 1 AS next FROM queue_items");
-  return row?.next ?? 1;
-}
-
 export async function addEpisodeToQueue(episodeId: string): Promise<QueueItem | null> {
   const ep = await one<{ id: string; title: string | null; audio_url: string | null; duration_sec: number | null }>(
     "SELECT id, title, audio_url, duration_sec FROM episodes WHERE id = $1",
     [episodeId],
   );
   if (!ep || !ep.audio_url) return null;
+  const durationMs = ep.duration_sec && ep.duration_sec > 0 ? int32(ep.duration_sec * 1000) ?? null : null;
   const row = await one<{ id: string }>(
     `INSERT INTO queue_items (episode_id, title, audio_url, source, position, duration_ms)
-     VALUES ($1, $2, $3, 'feed', $4, $5) RETURNING id`,
-    [ep.id, ep.title ?? "(untitled)", ep.audio_url, await nextPosition(), ep.duration_sec ? ep.duration_sec * 1000 : null],
+     VALUES ($1, $2, $3, 'feed', ${NEXT_POSITION}, $4) RETURNING id`,
+    [ep.id, ep.title ?? "(untitled)", ep.audio_url, durationMs],
   );
   return row ? getQueueItem(row.id) : null;
 }
 
-/** Idempotent on audio_url for uploads. Returns {item, created}. */
+/**
+ * Idempotent on audio_url for uploads, enforced by the partial unique index
+ * queue_items_upload_url_uidx, so the Blob onUploadCompleted callback and the browser's explicit
+ * POST /api/queue cannot both insert. Returns {item, created}.
+ */
 export async function addUploadToQueue(audioUrl: string, title: string): Promise<{ item: QueueItem | null; created: boolean }> {
+  const row = await one<{ id: string }>(
+    `INSERT INTO queue_items (title, audio_url, source, position)
+     VALUES ($1, $2, 'upload', ${NEXT_POSITION})
+     ON CONFLICT (audio_url) WHERE source = 'upload' DO NOTHING
+     RETURNING id`,
+    [title, audioUrl],
+  );
+  if (row) return { item: await getQueueItem(row.id), created: true };
   const existing = await one<{ id: string }>(
     "SELECT id FROM queue_items WHERE audio_url = $1 AND source = 'upload' LIMIT 1",
     [audioUrl],
   );
-  if (existing) return { item: await getQueueItem(existing.id), created: false };
-  const row = await one<{ id: string }>(
-    `INSERT INTO queue_items (title, audio_url, source, position) VALUES ($1, $2, 'upload', $3) RETURNING id`,
-    [title, audioUrl, await nextPosition()],
-  );
-  return { item: row ? await getQueueItem(row.id) : null, created: true };
+  return { item: existing ? await getQueueItem(existing.id) : null, created: false };
 }
