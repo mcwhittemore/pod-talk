@@ -45,9 +45,10 @@ cargo run --release --bin podtalk -- transcribe ~/models/ggml-tiny.en.bin some.m
 ./build-android.sh     # needs rustup target aarch64-linux-android, cargo-ndk, cmake, ninja, Android NDK
 ```
 
-Android:
+Android (first `source env.sh` from the repo root; it points at the JDK in `~/jdk` and the SDK in `~/Library/Android/sdk`):
 
 ```bash
+source env.sh
 cd android && ./gradlew assembleRelease -Ppodtalk.server=https://pod-talk-silk.vercel.app
 adb install app/build/outputs/apk/release/app-release.apk
 ```
