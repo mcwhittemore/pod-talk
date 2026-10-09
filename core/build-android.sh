@@ -18,4 +18,6 @@ AR="$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar"
 mkdir -p target/android-stubs && [ -f target/android-stubs/libggml-blas.a ] || "$AR" rcs target/android-stubs/libggml-blas.a
 export RUSTFLAGS="-L native=$(pwd)/target/android-stubs"
 cargo ndk -t arm64-v8a --platform 26 -o "$OUT" build --release --lib
+# whisper.cpp links the shared C++ runtime; ship it with the app.
+cp "$NDK/toolchains/llvm/prebuilt/"*/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so "$OUT/arm64-v8a/"
 ls -la "$OUT"/arm64-v8a/

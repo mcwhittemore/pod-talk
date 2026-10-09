@@ -5,6 +5,8 @@ import android.util.Log
 import ai.desertant.clear.Clear
 import ai.desertant.clear.Mastering
 import ai.desertant.clear.Options
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * desert-ant Clear: on-device denoise/dereverb/loudness for the listener's
@@ -16,10 +18,10 @@ class Enhancer(private val ctx: Context) {
 
     @Volatile var clear: Clear? = null
 
-    suspend fun warmUp() { runCatching { (clear ?: Clear(ctx).also { clear = it }).download() }.onFailure { Log.w("Enhancer", "Clear download failed: $it") } }
+    suspend fun warmUp() = withContext(Dispatchers.IO) { runCatching { (clear ?: Clear(ctx).also { clear = it }).download() }.onFailure { Log.w("Enhancer", "Clear download failed: $it") } }
 
-    suspend fun enhance(pcm16k: FloatArray): Result {
-        return try {
+    suspend fun enhance(pcm16k: FloatArray): Result = withContext(Dispatchers.Default) {
+        try {
             val c = clear ?: Clear(ctx).also { clear = it }
             val r = c.enhance(pcm16k, 16_000.0, Options(sampleRate = 16_000.0, mastering = Mastering()))
             Result(r.samples, true, r.processingSec)

@@ -64,7 +64,7 @@ class AppState(private val app: Application) {
     val serverOk = MutableStateFlow<Boolean?>(null)
     val modelProgress = MutableStateFlow<Float?>(null)
     val modelReady = MutableStateFlow(false)
-    val coreVersion = runCatching { PodTalkCore.version() }.getOrDefault("core unavailable")
+    val coreVersion: String by lazy { runCatching { PodTalkCore.version() }.getOrElse { "core unavailable: $it" } }
     val busy = MutableStateFlow(false)
 
     val exo: ExoPlayer = ExoPlayer.Builder(app).build().apply {
@@ -77,7 +77,7 @@ class AppState(private val app: Application) {
     init {
         companion.init()
         scope.launch {
-            modelReady.value = transcriber.modelReady(settings.model)
+            modelReady.value = withContext(Dispatchers.IO) { transcriber.modelReady(settings.model) }
             refresh()
             enhancer.warmUp()
         }
