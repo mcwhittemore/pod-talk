@@ -1,0 +1,9 @@
+This repo is an android app that will run on a pixel 8 running android 15 and a saas web app. The android app downloads audio files file urls given to it by the web app. It then plays them like a podcast. When it’s downloaded it uses desert-ant:voz to transcribe the audio. During playback, at anytime, the listener can interrupt and make comments or ask questions by talking to the app. This is a processes of using desert-ant:clear to clean up the sound of the question from the user and desert-ant:uhm to remove filler works, converting that audio into text via via desert-ant:voz and then running quick generation for the reply. The app will record the conversation as transcript and sync the transcript with the server. The transcript should have timestamps and indicators of which part of the audio file the conversation was about.
+
+Meh - it looks like desert-ant doesn’t have everything for andoird. Can you figure out how to resolve that? There must be a way these days.
+
+The web server is a set of rss feeds and file upload tools. The user can select things from the rss feeds and put them into the listen queue. The user can also upload audio files. The web server also emits web hooks about conversations. Some of these are basic update events like (got a new question) and (got a new response) but it also has some events like (conversation paused).
+
+This project needs to be in a single shot. If you have questions, think hard about the best way to solve them. Don’t ask for my help unless there is software you need to develop that I don’t have. You are in a GitHub repo. Track progress in a `progress` folder and commit all the time. I want to see images of the app and gifs of the functionality. The app will be deployed on vercel with neon as the database.
+
+Use rust for any code that needs to be wicked fast and native.
