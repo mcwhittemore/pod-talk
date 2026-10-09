@@ -61,3 +61,11 @@ Web: ![queue](web-queue.png) ![feed](web-feed-detail.png) ![conversation](web-co
 - Uploads: Blob store `pod-talk-audio` created and linked (`BLOB_READ_WRITE_TOKEN` set, within the Pro plan's included usage). Real upload through the browser was not exercised by me.
 - Install on the Pixel 8: `adb install android/app/build/outputs/apk/release/app-release.apk` (a GitHub release upload was blocked by the session's permission policy, so install from the local build), then enter the server URL (pre-filled with production) and the `POD_TALK_TOKEN` (kept in `~/.podtalk-token` on this Mac; it is the same value set on Vercel). Log in to the web app with the same token.
 - A real-mic run was not possible on the emulator; the identical pipeline was exercised through the bundled clip ("Mic pipeline self-test" button, kept in the app on purpose).
+
+## Review pass — 2026-10-08, later
+
+Two reviewer agents went over the server and the app/core, then applied their own fixes.
+
+- Server (`56a1bef`): idempotent uploads via a partial unique index, strict int validation on every ms/duration field (400 instead of 500), webhook delivery moved off the request path with `waitUntil`, advisory-locked schema apply, RSS fixes (relative enclosure URLs, image `media:content`, Atom enclosures, RSS 1.0, duration edge cases), batched episode upserts, constant-time token compare, verified TLS to Neon. Smoke: 30/30.
+- App + core (`efc5ce9`): streaming resampler (long episodes no longer decode into RAM at source rate), UTF-8-safe truncation, foreground `MediaSessionService` with audio focus and wake mode so playback survives screen-off, whisper context behind an `Arc` so questions aren't blocked by background transcription, 2 s chunk overlap, silence gating so an empty question isn't hallucinated, resumable downloads with retry, mic permission requested at the point of use, `conversation.ended` actually sent, cleartext limited to the dev host. Verified on the emulator including screen-off playback.
+- Also found during the pass: the `POD_TALK_TOKEN` on Vercel did not match the saved token (production rejected the app). Re-set and verified.
