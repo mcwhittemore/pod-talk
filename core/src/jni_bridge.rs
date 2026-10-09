@@ -98,6 +98,10 @@ pub extern "system" fn Java_dev_podtalk_core_PodTalkCore_nativeTranscribeFile(
     let lang = if lang.is_empty() { "en".to_string() } else { lang };
     let r = crate::transcribe::transcribe_file(&m, &a, threads, &lang, |done, total| {
         let _ = env.call_static_method(&class, "onProgress", "(JJ)V", &[(done as jlong).into(), (total as jlong).into()]);
+        // A Java exception left pending here would abort the VM on our next JNI call.
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
+        }
     });
     let s = match r {
         Ok(t) => serde_json::to_string(&t).unwrap_or_default(),

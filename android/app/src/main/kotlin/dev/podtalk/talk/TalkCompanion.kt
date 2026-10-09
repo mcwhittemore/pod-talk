@@ -61,8 +61,12 @@ class TalkCompanion(
         val raw = clip ?: recorder.record(onLevel = onLevel)
         onPhase(Phase.Cleaning)
         val t0 = System.currentTimeMillis()
+        if (raw.isEmpty()) {
+            Log.i("Companion", "nothing heard above the speech gate; skipping Clear and whisper")
+            return PodTalkCore.Transcript("whisper.cpp", 0, emptyList(), emptyList(), 0) to false
+        }
         val cleaned = enhancer.enhance(raw)
-        val trimmed = PodTalkCore.trimSilence(cleaned.pcm)
+        val trimmed = withContext(Dispatchers.Default) { PodTalkCore.trimSilence(cleaned.pcm) }
         Log.i("Companion", "question audio: raw=${raw.size} cleaned=${cleaned.pcm.size} (enhanced=${cleaned.enhanced}, ${cleaned.processingSec}s) trimmed=${trimmed.size} samples @16k; clear took ${System.currentTimeMillis() - t0}ms")
         onPhase(Phase.Transcribing)
         val t1 = System.currentTimeMillis()
@@ -83,7 +87,8 @@ class TalkCompanion(
     ): Exchange {
         onPhase(Phase.Thinking)
         val segments = transcript?.segments ?: emptyList()
-        val ex = PodTalkCore.excerpt(segments, positionMs)
+        // Serialising a whole-episode transcript to JSON for the core is too slow for the main thread.
+        val ex = withContext(Dispatchers.Default) { PodTalkCore.excerpt(segments, positionMs) }
         val qTurn = Turn("user", question, positionMs, ex.startMs, ex.endMs, ex.text.take(600), questionEngine)
         if (conversationId != null) runCatching { api.postTurn(conversationId, qTurn) }.onFailure { Log.w("Companion", "sync question failed: $it") }
 
@@ -91,7 +96,7 @@ class TalkCompanion(
         var answerText = runCatching { api.answer(question, ex.text, item.title, positionMs) }.getOrNull()
         var segStart = ex.startMs; var segEnd = ex.endMs; var excerpt = ex.text
         if (answerText == null) {
-            val local = PodTalkCore.answer(question, segments, positionMs)
+            val local = withContext(Dispatchers.Default) { PodTalkCore.answer(question, segments, positionMs) }
             answerText = local.text; engine = local.engine; segStart = local.segmentStartMs; segEnd = local.segmentEndMs; excerpt = local.excerpt
         }
         val aTurn = Turn("assistant", answerText, positionMs, segStart, segEnd, excerpt.take(600), engine)
@@ -118,10 +123,10 @@ class TalkCompanion(
         } finally { speaking = false }
     }
 
-    /** Self-test clip bundled as res/raw/sample_question.wav, decoded through the same Rust path. */
-    fun sampleClip(): FloatArray? {
+    /** Self-test clip bundled as res/raw/sample_question.wav, decoded through the same Rust path. Null if it cannot be decoded. */
+    fun sampleClip(): FloatArray? = runCatching {
         val f = File(ctx.cacheDir, "sample_question.wav")
-        if (!f.exists()) ctx.resources.openRawResource(dev.podtalk.R.raw.sample_question).use { i -> f.outputStream().use { i.copyTo(it) } }
-        return PodTalkCore.decode(f.path)
-    }
+        if (!f.exists() || f.length() == 0L) ctx.resources.openRawResource(dev.podtalk.R.raw.sample_question).use { i -> f.outputStream().use { i.copyTo(it) } }
+        PodTalkCore.decode(f.path)
+    }.onFailure { Log.w("Companion", "sample clip unavailable: $it") }.getOrNull()
 }

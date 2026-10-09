@@ -11,9 +11,17 @@ class Store(ctx: Context) {
     val transcriptDir: File = File(ctx.filesDir, "transcripts").apply { mkdirs() }
     val modelDir: File = File(ctx.filesDir, "models").apply { mkdirs() }
 
-    fun audioFile(item: QueueItem): File {
-        val ext = item.audioUrl.substringBefore('?').substringAfterLast('.', "mp3").take(4).ifBlank { "mp3" }
-        return File(audioDir, "${item.id}.$ext")
+    fun audioFile(item: QueueItem): File = File(audioDir, "${item.id}.${audioExt(item.audioUrl)}")
+
+    companion object {
+        private val KNOWN_EXT = setOf("mp3", "m4a", "aac", "mp4", "wav", "ogg", "oga", "opus", "flac", "webm")
+
+        /** Extension of the URL's last path segment, never the host; falls back to mp3 for unknown/absent ones. */
+        fun audioExt(url: String): String {
+            val seg = runCatching { android.net.Uri.parse(url).lastPathSegment }.getOrNull() ?: ""
+            val ext = seg.substringAfterLast('.', "").lowercase()
+            return if (ext in KNOWN_EXT) ext else "mp3"
+        }
     }
     fun partFile(item: QueueItem): File = File(audioDir, "${item.id}.part")
 

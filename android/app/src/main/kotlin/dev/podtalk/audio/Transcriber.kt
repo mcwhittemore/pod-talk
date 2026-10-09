@@ -6,7 +6,6 @@ import dev.podtalk.data.Store
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.File
 
 /**
@@ -31,16 +30,9 @@ class Transcriber(private val http: OkHttpClient, private val store: Store) {
         val sideloaded = File("/sdcard/Download/ggml-$name.bin")
         if (sideloaded.canRead() && sideloaded.length() > 1_000_000) { sideloaded.copyTo(f, overwrite = true); return@withContext f }
         val url = MODELS[name] ?: error("unknown model $name")
-        val part = File(f.path + ".part")
-        http.newCall(Request.Builder().url(url).build()).execute().use { r ->
-            if (!r.isSuccessful) error("model download failed: HTTP ${r.code}")
-            val body = r.body!!; val total = body.contentLength()
-            body.byteStream().use { inp -> part.outputStream().use { out ->
-                val buf = ByteArray(256 * 1024); var done = 0L
-                while (true) { val n = inp.read(buf); if (n < 0) break; out.write(buf, 0, n); done += n; if (total > 0) onProgress(done.toFloat() / total) }
-            } }
-        }
-        part.renameTo(f); f
+        ResumableDownload.fetch(http, url, File(f.path + ".part"), f, onProgress = onProgress)
+        if (!modelReady(name)) { f.delete(); error("model download incomplete") }
+        f
     }
 
     suspend fun transcribe(modelName: String, audio: File, onProgress: (Float) -> Unit): LocalTranscript = withContext(Dispatchers.Default) {

@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub mod audio;
 pub mod answer;
@@ -53,8 +53,11 @@ pub struct Answer {
     pub engine: String,
 }
 
-/// Global whisper context cache so repeated calls don't reload the model.
-pub(crate) static CTX_CACHE: Mutex<Option<(String, whisper_rs::WhisperContext)>> = Mutex::new(None);
+/// Global whisper context cache so repeated calls don't reload the model. The
+/// lock is only held while swapping the model; callers clone the `Arc` and run
+/// inference on their own `WhisperState` outside the lock, so a question can
+/// be transcribed while a long episode is being chunked through.
+pub(crate) static CTX_CACHE: Mutex<Option<Arc<(String, whisper_rs::WhisperContext)>>> = Mutex::new(None);
 
 /// Word frequency helper shared by answer + fillers.
 pub(crate) fn tokenize(s: &str) -> Vec<String> {

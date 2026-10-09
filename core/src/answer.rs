@@ -136,7 +136,11 @@ fn best_sentence(text: &str, q: &[String]) -> String {
     let hi = (best.0 + 2).min(sentences.len());
     let mut s = sentences[lo..hi].join(" ");
     if s.len() > 420 {
-        s.truncate(420);
+        let mut cut = 420;
+        while !s.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        s.truncate(cut);
         s.push('…');
     }
     s
@@ -160,5 +164,13 @@ mod tests {
         let a = answer("how do the ants navigate", &segs, 36000);
         assert!(a.text.contains("pedometer"), "{}", a.text);
         assert_eq!(a.segment_start_ms, 30000);
+    }
+    #[test]
+    fn truncates_on_char_boundary() {
+        // 'é' is two bytes; make byte 420 land inside one.
+        let text = format!("{}é{}.", "a".repeat(419), "b".repeat(50));
+        let s = best_sentence(&text, &[]);
+        assert!(s.ends_with('…'));
+        assert!(s.len() <= 420 + '…'.len_utf8());
     }
 }

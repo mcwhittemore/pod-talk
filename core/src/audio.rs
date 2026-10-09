@@ -8,6 +8,8 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
 pub const TARGET_RATE: u32 = 16_000;
+/// Loudest-frame RMS below which `trim_silence` treats the whole clip as silence.
+pub const MIN_SPEECH_RMS: f32 = 0.01;
 
 /// Decode any supported container/codec to 16 kHz mono f32 in [-1, 1].
 pub fn decode_to_16k(path: &str) -> Result<Vec<f32>, String> {
@@ -31,14 +33,21 @@ pub fn decode_to_16k(path: &str) -> Result<Vec<f32>, String> {
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| format!("decoder: {e}"))?;
     let src_rate = track.codec_params.sample_rate.ok_or("unknown sample rate")?;
-    let mut mono: Vec<f32> = Vec::new();
+    // Resample packet by packet so only the 16 kHz output is ever held in memory
+    // (a 2 h episode at 44.1 kHz would otherwise need >1 GB before resampling).
+    let mut rs = StreamResampler::new(src_rate, TARGET_RATE);
+    let mut out: Vec<f32> = Vec::with_capacity(
+        track.codec_params.n_frames.map(|n| (n as f64 * TARGET_RATE as f64 / src_rate as f64) as usize + 16).unwrap_or(0),
+    );
+    let mut packet_buf: Vec<f32> = Vec::new();
+    let mut got_any = false;
     loop {
         let packet = match format.next_packet() {
             Ok(p) => p,
             Err(symphonia::core::errors::Error::IoError(_)) => break,
             Err(symphonia::core::errors::Error::ResetRequired) => break,
             Err(e) => {
-                if mono.is_empty() {
+                if !got_any {
                     return Err(format!("packet: {e}"));
                 }
                 break;
@@ -48,12 +57,69 @@ pub fn decode_to_16k(path: &str) -> Result<Vec<f32>, String> {
             continue;
         }
         match decoder.decode(&packet) {
-            Ok(buf) => push_mono(&buf, &mut mono),
+            Ok(buf) => {
+                packet_buf.clear();
+                push_mono(&buf, &mut packet_buf);
+                got_any = true;
+                rs.push(&packet_buf, &mut out);
+            }
             Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
             Err(_) => break,
         }
     }
-    Ok(resample_linear(&mono, src_rate, TARGET_RATE))
+    rs.finish(&mut out);
+    Ok(out)
+}
+
+/// Linear-interpolation resampler that accepts input in arbitrary pieces and
+/// carries the last sample across calls so piece boundaries are seamless.
+pub struct StreamResampler {
+    ratio: f64,
+    /// Position of the next output sample, in input samples, relative to index 0 of the next piece.
+    pos: f64,
+    prev: Option<f32>,
+}
+
+impl StreamResampler {
+    pub fn new(from: u32, to: u32) -> Self {
+        StreamResampler { ratio: from as f64 / to as f64, pos: 0.0, prev: None }
+    }
+
+    pub fn push(&mut self, input: &[f32], out: &mut Vec<f32>) {
+        if input.is_empty() {
+            return;
+        }
+        if self.ratio == 1.0 {
+            out.extend_from_slice(input);
+            return;
+        }
+        let n = input.len();
+        let sample = |i: i64| -> f32 {
+            if i < 0 { self.prev.unwrap_or(input[0]) } else { input[i as usize] }
+        };
+        // Emit while both interpolation neighbours are available.
+        while self.pos.floor() as i64 + 1 < n as i64 {
+            let idx = self.pos.floor() as i64;
+            let frac = (self.pos - idx as f64) as f32;
+            let a = sample(idx);
+            let b = sample(idx + 1);
+            out.push(a + (b - a) * frac);
+            self.pos += self.ratio;
+        }
+        self.prev = Some(input[n - 1]);
+        self.pos -= n as f64;
+    }
+
+    /// Flush the trailing samples that only became complete at end of stream.
+    pub fn finish(&mut self, out: &mut Vec<f32>) {
+        if let Some(p) = self.prev {
+            while self.pos < 0.0 {
+                out.push(p);
+                self.pos += self.ratio;
+            }
+        }
+        self.prev = None;
+    }
 }
 
 fn push_mono(buf: &AudioBufferRef, out: &mut Vec<f32>) {
@@ -89,17 +155,10 @@ pub fn resample_linear(input: &[f32], from: u32, to: u32) -> Vec<f32> {
     if from == to || input.is_empty() {
         return input.to_vec();
     }
-    let ratio = from as f64 / to as f64;
-    let out_len = ((input.len() as f64) / ratio).floor() as usize;
-    let mut out = Vec::with_capacity(out_len);
-    for i in 0..out_len {
-        let pos = i as f64 * ratio;
-        let idx = pos.floor() as usize;
-        let frac = (pos - idx as f64) as f32;
-        let a = input[idx.min(input.len() - 1)];
-        let b = input[(idx + 1).min(input.len() - 1)];
-        out.push(a + (b - a) * frac);
-    }
+    let mut rs = StreamResampler::new(from, to);
+    let mut out = Vec::with_capacity((input.len() as f64 * to as f64 / from as f64) as usize + 1);
+    rs.push(input, &mut out);
+    rs.finish(&mut out);
     out
 }
 
@@ -116,6 +175,10 @@ pub fn trim_silence(pcm: &[f32], rate: u32, max_gap_ms: u32) -> Vec<f32> {
         .map(|c| (c.iter().map(|x| x * x).sum::<f32>() / c.len() as f32).sqrt())
         .collect();
     let peak = rms.iter().cloned().fold(0f32, f32::max);
+    // Absolute floor: a clip whose loudest 20 ms frame is below this is room noise, not speech.
+    if peak < MIN_SPEECH_RMS {
+        return Vec::new();
+    }
     let thr = (peak * 0.08).max(0.004);
     let voiced: Vec<bool> = rms.iter().map(|&r| r > thr).collect();
     let first = match voiced.iter().position(|&v| v) {
@@ -152,6 +215,26 @@ mod tests {
         let r = resample_linear(&v, 32000, 16000);
         assert_eq!(r.len(), 50);
         assert!((r[10] - 20.0).abs() < 1e-3);
+    }
+    #[test]
+    fn stream_matches_batch_across_pieces() {
+        let v: Vec<f32> = (0..1000).map(|i| ((i as f32) * 0.3).sin()).collect();
+        let whole = resample_linear(&v, 44100, 16000);
+        let mut rs = StreamResampler::new(44100, 16000);
+        let mut out = Vec::new();
+        for piece in v.chunks(37) {
+            rs.push(piece, &mut out);
+        }
+        rs.finish(&mut out);
+        assert_eq!(whole.len(), out.len());
+        for (a, b) in whole.iter().zip(&out) {
+            assert!((a - b).abs() < 1e-5);
+        }
+    }
+    #[test]
+    fn quiet_clip_is_silence() {
+        let v: Vec<f32> = (0..16000).map(|i| ((i as f32) * 0.1).sin() * 0.003).collect();
+        assert!(trim_silence(&v, 16000, 300).is_empty());
     }
     #[test]
     fn trims_edges() {

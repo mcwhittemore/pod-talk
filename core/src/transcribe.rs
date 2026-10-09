@@ -2,20 +2,31 @@
 
 use crate::fillers::{self, Word};
 use crate::{Segment, Transcript, CTX_CACHE};
+use std::sync::Arc;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
-fn ensure_ctx(model_path: &str) -> Result<(), String> {
+/// Returns the cached context for `model_path`, loading it if needed. The
+/// cache lock is released before returning so inference never blocks other
+/// callers; a context that gets replaced stays alive until its last user drops it.
+fn ensure_ctx(model_path: &str) -> Result<Arc<(String, WhisperContext)>, String> {
     let mut guard = CTX_CACHE.lock().map_err(|_| "ctx lock poisoned")?;
-    if let Some((p, _)) = guard.as_ref() {
-        if p == model_path {
-            return Ok(());
+    if let Some(c) = guard.as_ref() {
+        if c.0 == model_path {
+            return Ok(Arc::clone(c));
         }
     }
     let mut params = WhisperContextParameters::default();
     params.use_gpu(false);
     let ctx = WhisperContext::new_with_params(model_path, params).map_err(|e| format!("load model: {e:?}"))?;
-    *guard = Some((model_path.to_string(), ctx));
-    Ok(())
+    let c = Arc::new((model_path.to_string(), ctx));
+    *guard = Some(Arc::clone(&c));
+    Ok(c)
+}
+
+/// Whisper writes non-speech as bracketed tags: `[BLANK_AUDIO]`, `[Music]`, `(upbeat music)`.
+fn is_non_speech(text: &str) -> bool {
+    let t = text.trim();
+    (t.starts_with('[') && t.ends_with(']')) || (t.starts_with('(') && t.ends_with(')'))
 }
 
 /// Transcribe 16 kHz mono PCM. `offset_ms` shifts timestamps (useful when
@@ -33,10 +44,8 @@ pub fn transcribe(
     if pcm.len() < 1600 {
         return Ok(Transcript { engine: engine_name(model_path), duration_ms: 0, segments: vec![], fillers_removed: vec![], processing_ms: 0 });
     }
-    ensure_ctx(model_path)?;
-    let guard = CTX_CACHE.lock().map_err(|_| "ctx lock poisoned")?;
-    let (_, ctx) = guard.as_ref().ok_or("no ctx")?;
-    let mut state = ctx.create_state().map_err(|e| format!("state: {e:?}"))?;
+    let ctx = ensure_ctx(model_path)?;
+    let mut state = ctx.1.create_state().map_err(|e| format!("state: {e:?}"))?;
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_n_threads(threads.max(1));
     params.set_language(Some(language));
@@ -68,8 +77,8 @@ pub fn transcribe(
                 Ok(t) => t.to_string(),
                 Err(_) => continue,
             };
-            if text.starts_with("[_") || text.starts_with("<|") {
-                continue; // special tokens
+            if text.starts_with("[_") || text.starts_with("<|") || is_non_speech(&text) {
+                continue; // special tokens and non-speech tags
             }
             let d = tok.token_data();
             let (t0, t1) = (d.t0 * 10 + offset_ms, d.t1 * 10 + offset_ms);
@@ -84,7 +93,7 @@ pub fn transcribe(
         fillers_removed.extend(removed);
         let text: String = kept.iter().map(|w| w.text.as_str()).collect::<String>();
         let text = text.trim().to_string();
-        if text.is_empty() {
+        if text.is_empty() || is_non_speech(&text) {
             continue;
         }
         segments.push(Segment { start_ms: s_start, end_ms: s_end, text });
@@ -103,9 +112,14 @@ fn engine_name(model_path: &str) -> String {
     format!("whisper.cpp/{name}")
 }
 
+/// Chunk length and overlap for whole-file transcription, in samples at 16 kHz.
+const CHUNK_SAMPLES: usize = 16_000 * 300;
+const OVERLAP_SAMPLES: usize = 16_000 * 2;
+
 /// Transcribe a whole audio file by decoding it and running whisper in
-/// 5-minute chunks (keeps memory flat on the phone). `progress` is called with
-/// (done_ms, total_ms).
+/// 5-minute chunks that overlap by 2 s, so a word straddling a boundary is
+/// heard whole by one of them. Each chunk keeps the segments that start on its
+/// side of the overlap's midpoint. `progress` is called with (done_ms, total_ms).
 pub fn transcribe_file(
     model_path: &str,
     audio_path: &str,
@@ -115,17 +129,23 @@ pub fn transcribe_file(
 ) -> Result<Transcript, String> {
     let pcm = crate::audio::decode_to_16k(audio_path)?;
     let total_ms = pcm.len() as i64 * 1000 / 16_000;
-    let chunk = 16_000 * 300;
     let mut all = Transcript { engine: engine_name(model_path), duration_ms: total_ms, segments: vec![], fillers_removed: vec![], processing_ms: 0 };
     let t0 = std::time::Instant::now();
+    let ms = |samples: usize| samples as i64 * 1000 / 16_000;
     let mut off = 0usize;
+    let mut keep_from_ms = 0i64; // segments starting before this belong to the previous chunk
     while off < pcm.len() {
-        let end = (off + chunk).min(pcm.len());
-        let offset_ms = off as i64 * 1000 / 16_000;
-        let t = transcribe(model_path, &pcm[off..end], threads, false, offset_ms, language)?;
-        all.segments.extend(t.segments);
-        off = end;
-        progress(off as i64 * 1000 / 16_000, total_ms);
+        let end = (off + CHUNK_SAMPLES).min(pcm.len());
+        let last = end == pcm.len();
+        let keep_to_ms = if last { i64::MAX } else { ms(end - OVERLAP_SAMPLES / 2) };
+        let t = transcribe(model_path, &pcm[off..end], threads, false, ms(off), language)?;
+        all.segments.extend(t.segments.into_iter().filter(|s| s.start_ms >= keep_from_ms && s.start_ms < keep_to_ms));
+        progress(ms(end), total_ms);
+        if last {
+            break;
+        }
+        keep_from_ms = keep_to_ms;
+        off = end - OVERLAP_SAMPLES;
     }
     all.processing_ms = t0.elapsed().as_millis();
     Ok(all)

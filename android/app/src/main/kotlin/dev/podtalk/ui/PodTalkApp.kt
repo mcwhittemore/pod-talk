@@ -1,5 +1,9 @@
 package dev.podtalk.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,7 +15,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -37,7 +44,7 @@ private val Muted = Color(0xFF64748B)
 @Composable
 fun PodTalkApp(state: AppState) {
     MaterialTheme(colorScheme = lightColorScheme(primary = Blue, background = Paper, surface = Color.White, onBackground = Ink, onSurface = Ink)) {
-        var showSettings by remember { mutableStateOf(!state.settings.configured) }
+        var showSettings by rememberSaveable { mutableStateOf(!state.settings.configured) }
         val player by state.player.collectAsStateWithLifecycle()
         Surface(Modifier.fillMaxSize(), color = Paper) {
             when {
@@ -158,8 +165,16 @@ fun PlayerScreen(state: AppState) {
     val busy by state.busy.collectAsStateWithLifecycle()
     val item = p.item ?: return
     val transcript = local[item.id]?.transcript
-    var typed by remember { mutableStateOf("") }
-    var showTyped by remember { mutableStateOf(false) }
+    var typed by rememberSaveable { mutableStateOf("") }
+    var showTyped by rememberSaveable { mutableStateOf(false) }
+    val ctx = LocalContext.current
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) state.ask() else state.setError("Microphone permission denied. Allow it in the system app settings for Pod Talk, or type your question instead.")
+    }
+    val askWithMic = {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) state.ask()
+        else micPermission.launch(Manifest.permission.RECORD_AUDIO)
+    }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(8.dp, 8.dp, 16.dp, 0.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { state.closePlayer() }) { Icon(Icons.Default.ArrowBack, "Back") }
@@ -191,7 +206,7 @@ fun PlayerScreen(state: AppState) {
         val listening = p.phase is TalkCompanion.Phase.Listening
         Column(Modifier.fillMaxWidth().padding(20.dp, 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Button(
-                onClick = { if (listening) state.stopListening() else state.ask() },
+                onClick = { if (listening) state.stopListening() else askWithMic() },
                 enabled = !busy || listening,
                 colors = ButtonDefaults.buttonColors(containerColor = if (listening) Color(0xFFDC2626) else Blue),
                 modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(26.dp),
@@ -208,7 +223,7 @@ fun PlayerScreen(state: AppState) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { showTyped = !showTyped }, enabled = !busy) { Text("Type instead") }
-                TextButton(onClick = { state.ask(clip = state.companion.sampleClip()) }, enabled = !busy) { Text("Mic pipeline self-test") }
+                TextButton(onClick = { state.askWithSampleClip() }, enabled = !busy) { Text("Mic pipeline self-test") }
             }
             if (showTyped) Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(typed, { typed = it }, modifier = Modifier.weight(1f), singleLine = true, placeholder = { Text("Ask about what you just heard") })

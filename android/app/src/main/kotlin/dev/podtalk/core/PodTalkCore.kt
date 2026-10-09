@@ -38,38 +38,39 @@ object PodTalkCore {
     /** Called from Rust during whole-file transcription. */
     @JvmStatic fun onProgress(doneMs: Long, totalMs: Long) { progressListener?.invoke(doneMs, totalMs) }
 
-    fun version(): String = nativeVersion()
+    fun version(): String = nativeVersion() ?: "podtalk-core (version unavailable)"
 
     /** Decode any audio file to 16 kHz mono PCM. */
     fun decode(path: String): FloatArray? = nativeDecode(path)
 
-    fun trimSilence(pcm: FloatArray, rate: Int = 16000, maxGapMs: Int = 400): FloatArray = nativeTrimSilence(pcm, rate, maxGapMs)
+    fun trimSilence(pcm: FloatArray, rate: Int = 16000, maxGapMs: Int = 400): FloatArray =
+        nativeTrimSilence(pcm, rate, maxGapMs) ?: throw RuntimeException("podtalk-core: trimSilence failed (out of memory?)")
 
     fun transcribePcm(modelPath: String, pcm: FloatArray, threads: Int = 4, stripFillers: Boolean = true, language: String = "en"): Transcript =
-        parseTranscript(nativeTranscribePcm(modelPath, pcm, threads, stripFillers, language))
+        parseTranscript(nativeTranscribePcm(modelPath, pcm, threads, stripFillers, language) ?: error("podtalk-core returned null"))
 
     fun transcribeFile(modelPath: String, audioPath: String, threads: Int = 4, language: String = "en", onProgress: ((Long, Long) -> Unit)? = null): Transcript {
         progressListener = onProgress
         try {
-            return parseTranscript(nativeTranscribeFile(modelPath, audioPath, threads, language))
+            return parseTranscript(nativeTranscribeFile(modelPath, audioPath, threads, language) ?: error("podtalk-core returned null"))
         } finally {
             progressListener = null
         }
     }
 
     fun answer(question: String, segments: List<Segment>, positionMs: Long): LocalAnswer {
-        val o = JSONObject(nativeAnswer(question, Segment.listToJson(segments).toString(), positionMs))
+        val o = JSONObject(nativeAnswer(question, Segment.listToJson(segments).toString(), positionMs) ?: error("podtalk-core returned null"))
         return LocalAnswer(o.getString("text"), o.getLong("segment_start_ms"), o.getLong("segment_end_ms"), o.getString("excerpt"), o.getDouble("score"), o.getString("engine"))
     }
 
     data class Excerpt(val text: String, val startMs: Long, val endMs: Long)
 
     fun excerpt(segments: List<Segment>, positionMs: Long, windowMs: Long = 90_000): Excerpt {
-        val o = JSONObject(nativeExcerpt(Segment.listToJson(segments).toString(), positionMs, windowMs))
+        val o = JSONObject(nativeExcerpt(Segment.listToJson(segments).toString(), positionMs, windowMs) ?: error("podtalk-core returned null"))
         return Excerpt(o.getString("text"), o.getLong("start_ms"), o.getLong("end_ms"))
     }
 
-    fun stripFillers(text: String): String = nativeStripFillers(text)
+    fun stripFillers(text: String): String = nativeStripFillers(text) ?: text
 
     private fun parseTranscript(json: String): Transcript {
         val o = JSONObject(json)
@@ -85,12 +86,13 @@ object PodTalkCore {
     }
 
     @JvmStatic private external fun nativeInit()
-    @JvmStatic private external fun nativeVersion(): String
+    // All natives may return null when the JNI allocation fails (OOM); the wrappers above turn that into an exception.
+    @JvmStatic private external fun nativeVersion(): String?
     @JvmStatic private external fun nativeDecode(path: String): FloatArray?
-    @JvmStatic private external fun nativeTrimSilence(pcm: FloatArray, rate: Int, maxGapMs: Int): FloatArray
-    @JvmStatic private external fun nativeTranscribePcm(model: String, pcm: FloatArray, threads: Int, stripFillers: Boolean, language: String): String
-    @JvmStatic private external fun nativeTranscribeFile(model: String, audio: String, threads: Int, language: String): String
-    @JvmStatic private external fun nativeAnswer(question: String, segmentsJson: String, positionMs: Long): String
-    @JvmStatic private external fun nativeExcerpt(segmentsJson: String, positionMs: Long, windowMs: Long): String
-    @JvmStatic private external fun nativeStripFillers(text: String): String
+    @JvmStatic private external fun nativeTrimSilence(pcm: FloatArray, rate: Int, maxGapMs: Int): FloatArray?
+    @JvmStatic private external fun nativeTranscribePcm(model: String, pcm: FloatArray, threads: Int, stripFillers: Boolean, language: String): String?
+    @JvmStatic private external fun nativeTranscribeFile(model: String, audio: String, threads: Int, language: String): String?
+    @JvmStatic private external fun nativeAnswer(question: String, segmentsJson: String, positionMs: Long): String?
+    @JvmStatic private external fun nativeExcerpt(segmentsJson: String, positionMs: Long, windowMs: Long): String?
+    @JvmStatic private external fun nativeStripFillers(text: String): String?
 }
