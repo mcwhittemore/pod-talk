@@ -1,0 +1,1 @@
+/Users/mcwhittemore/mcw/pod-talk/core/target/release/libpodtalk_core.rlib: /Users/mcwhittemore/mcw/pod-talk/core/src/answer.rs /Users/mcwhittemore/mcw/pod-talk/core/src/audio.rs /Users/mcwhittemore/mcw/pod-talk/core/src/fillers.rs /Users/mcwhittemore/mcw/pod-talk/core/src/lib.rs /Users/mcwhittemore/mcw/pod-talk/core/src/transcribe.rs
