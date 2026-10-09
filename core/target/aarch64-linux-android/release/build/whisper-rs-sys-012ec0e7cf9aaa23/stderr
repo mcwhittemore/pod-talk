@@ -1,0 +1,159 @@
+running: cd "/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/build" && CMAKE_PREFIX_PATH="" LC_ALL="C" "cmake" "-Wdev" "--debug-output" "/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/" "-B" "/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/build" "-G" "Ninja" "-DBUILD_SHARED_LIBS=OFF" "-DWHISPER_ALL_WARNINGS=OFF" "-DWHISPER_ALL_WARNINGS_3RD_PARTY=OFF" "-DWHISPER_BUILD_TESTS=OFF" "-DWHISPER_BUILD_EXAMPLES=OFF" "-DGGML_METAL=OFF" "-DCMAKE_BUILD_TYPE=Release" "-DCMAKE_ANDROID_ARCH_ABI=arm64-v8a" "-DCMAKE_ANDROID_NDK=/Users/mcwhittemore/Library/Android/sdk/ndk/27.2.12479018" "-DCMAKE_GENERATOR=Ninja" "-DCMAKE_MAKE_PROGRAM=/opt/homebrew/bin/ninja" "-DCMAKE_SYSTEM_NAME=Android" "-DCMAKE_SYSTEM_VERSION=26" "-DGGML_OPENMP=OFF" "-DCMAKE_INSTALL_PREFIX=/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out" "-DCMAKE_C_FLAGS= -DANDROID -ffunction-sections -fdata-sections -fPIC --target=aarch64-linux-android -w --target=aarch64-linux-android26" "-DCMAKE_C_COMPILER=/Users/mcwhittemore/Library/Android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang" "-DCMAKE_CXX_FLAGS= -DANDROID -ffunction-sections -fdata-sections -fPIC --target=aarch64-linux-android -w --target=aarch64-linux-android26" "-DCMAKE_CXX_COMPILER=/Users/mcwhittemore/Library/Android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++" "-DCMAKE_ASM_FLAGS= -DANDROID -ffunction-sections -fdata-sections -fPIC --target=aarch64-linux-android -w --target=aarch64-linux-android26" "-DCMAKE_ASM_COMPILER=/Users/mcwhittemore/Library/Android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang" "-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"
+CMake Warning (dev) at /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCompiler.cmake:152 (set):
+  Policy CMP0126 is not set: set(CACHE) does not remove a normal variable of
+  the same name.  Run "cmake --help-policy CMP0126" for policy details.  Use
+  the cmake_policy command to set the policy and suppress this warning.
+
+  For compatibility with older versions of CMake, normal variable
+  "CMAKE_C_COMPILER" will be removed from the current scope.
+Call Stack (most recent call first):
+  /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCCompiler.cmake:68 (_cmake_find_compiler_path)
+  CMakeLists.txt:2 (project)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [3]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCompiler.cmake
+                [2]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCCompiler.cmake
+                [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+CMake Warning (dev) at /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCompiler.cmake:152 (set):
+  Policy CMP0126 is not set: set(CACHE) does not remove a normal variable of
+  the same name.  Run "cmake --help-policy CMP0126" for policy details.  Use
+  the cmake_policy command to set the policy and suppress this warning.
+
+  For compatibility with older versions of CMake, normal variable
+  "CMAKE_CXX_COMPILER" will be removed from the current scope.
+Call Stack (most recent call first):
+  /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:72 (_cmake_find_compiler_path)
+  CMakeLists.txt:2 (project)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [3]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCompiler.cmake
+                [2]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake
+                [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+CMake Warning (dev) at /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeFindBinUtils.cmake:235 (find_program):
+  Policy CMP0126 is not set: set(CACHE) does not remove a normal variable of
+  the same name.  Run "cmake --help-policy CMP0126" for policy details.  Use
+  the cmake_policy command to set the policy and suppress this warning.
+
+  For compatibility with older versions of CMake, normal variable
+  "CMAKE_TAPI" will be removed from the current scope.
+Call Stack (most recent call first):
+  /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake:207 (include)
+  CMakeLists.txt:2 (project)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [3]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeFindBinUtils.cmake
+                [2]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCXXCompiler.cmake
+                [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+CMake Warning (dev) at /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:74 (try_compile):
+  Policy CMP0066 is not set: Honor per-config flags in try_compile()
+  source-file signature.  Run "cmake --help-policy CMP0066" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+
+  For compatibility with older versions of CMake, try_compile is not honoring
+  caller config-specific compiler flags (e.g.  CMAKE_C_FLAGS_DEBUG) in the
+  test project.
+Call Stack (most recent call first):
+  /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeTestCCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)
+  CMakeLists.txt:2 (project)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [3]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCompilerABI.cmake
+                [2]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeTestCCompiler.cmake
+                [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+CMake Warning (dev) at /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:74 (try_compile):
+  Policy CMP0066 is not set: Honor per-config flags in try_compile()
+  source-file signature.  Run "cmake --help-policy CMP0066" for policy
+  details.  Use the cmake_policy command to set the policy and suppress this
+  warning.
+
+  For compatibility with older versions of CMake, try_compile is not honoring
+  caller config-specific compiler flags (e.g.  CMAKE_C_FLAGS_DEBUG) in the
+  test project.
+Call Stack (most recent call first):
+  /opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)
+  CMakeLists.txt:2 (project)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [3]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeDetermineCompilerABI.cmake
+                [2]	/opt/homebrew/Cellar/cmake/3.30.5/share/cmake/Modules/CMakeTestCXXCompiler.cmake
+                [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+   Entering             /Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+   Entering             /Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/CMakeLists.txt
+   Entering             /Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src/ggml-cpu
+   Called from: [2]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src/CMakeLists.txt
+                [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src/CMakeLists.txt
+   Returning to         /Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src
+   Called from: [2]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src/CMakeLists.txt
+                [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src/CMakeLists.txt
+   Returning to         /Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/CMakeLists.txt
+   Returning to         /Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+   Entering             /Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/src
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+   Returning to         /Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+CMake Warning (dev) in CMakeLists.txt:
+  Policy CMP0082 is not set: Install rules from add_subdirectory() are
+  interleaved with those in caller.  Run "cmake --help-policy CMP0082" for
+  policy details.  Use the cmake_policy command to set the policy and
+  suppress this warning.
+
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/CMakeLists.txt
+CMake Warning (dev) at ggml/src/CMakeLists.txt:190 (add_library):
+  Policy CMP0156 is not set: De-duplicate libraries on link lines based on
+  linker capabilities.  Run "cmake --help-policy CMP0156" for policy details.
+  Use the cmake_policy command to set the policy and suppress this warning.
+
+  Since the policy is not set, legacy libraries de-duplication strategy will
+  be applied.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src/CMakeLists.txt
+CMake Warning (dev) at ggml/src/CMakeLists.txt:213 (add_library):
+  Policy CMP0156 is not set: De-duplicate libraries on link lines based on
+  linker capabilities.  Run "cmake --help-policy CMP0156" for policy details.
+  Use the cmake_policy command to set the policy and suppress this warning.
+
+  Since the policy is not set, legacy libraries de-duplication strategy will
+  be applied.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src/CMakeLists.txt
+CMake Warning (dev) at ggml/src/CMakeLists.txt:243 (add_library):
+  Policy CMP0156 is not set: De-duplicate libraries on link lines based on
+  linker capabilities.  Run "cmake --help-policy CMP0156" for policy details.
+  Use the cmake_policy command to set the policy and suppress this warning.
+
+  Since the policy is not set, legacy libraries de-duplication strategy will
+  be applied.
+Call Stack (most recent call first):
+  ggml/src/ggml-cpu/CMakeLists.txt:22 (ggml_add_backend_library)
+  ggml/src/CMakeLists.txt:372 (ggml_add_cpu_backend_variant_impl)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/ggml/src/CMakeLists.txt
+CMake Warning (dev) at src/CMakeLists.txt:105 (add_library):
+  Policy CMP0156 is not set: De-duplicate libraries on link lines based on
+  linker capabilities.  Run "cmake --help-policy CMP0156" for policy details.
+  Use the cmake_policy command to set the policy and suppress this warning.
+
+  Since the policy is not set, legacy libraries de-duplication strategy will
+  be applied.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+   Called from: [1]	/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/whisper.cpp/src/CMakeLists.txt
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_ASM_COMPILER
+    CMAKE_ASM_FLAGS
+    CMAKE_VERBOSE_MAKEFILE
+
+
+running: cd "/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/build" && LC_ALL="C" "cmake" "--build" "/Users/mcwhittemore/mcw/pod-talk/core/target/aarch64-linux-android/release/build/whisper-rs-sys-012ec0e7cf9aaa23/out/build" "--target" "install" "--config" "Release" "--parallel" "8"
