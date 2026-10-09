@@ -41,6 +41,9 @@ class TalkCompanion(
 
     data class Exchange(val question: Turn, val answer: Turn, val questionRaw: String, val enhanced: Boolean, val fillersRemoved: Int)
 
+    /** ggml spin-waits between threads; leave cores for the UI or it crawls (4 threads on a 4-core emulator: minutes). */
+    private fun whisperThreads() = (Runtime.getRuntime().availableProcessors() - 2).coerceIn(1, 4)
+
     private var tts: TextToSpeech? = null
     @Volatile var speaking = false
 
@@ -57,10 +60,14 @@ class TalkCompanion(
         onPhase(Phase.Listening)
         val raw = clip ?: recorder.record(onLevel = onLevel)
         onPhase(Phase.Cleaning)
+        val t0 = System.currentTimeMillis()
         val cleaned = enhancer.enhance(raw)
         val trimmed = PodTalkCore.trimSilence(cleaned.pcm)
+        Log.i("Companion", "question audio: raw=${raw.size} cleaned=${cleaned.pcm.size} (enhanced=${cleaned.enhanced}, ${cleaned.processingSec}s) trimmed=${trimmed.size} samples @16k; clear took ${System.currentTimeMillis() - t0}ms")
         onPhase(Phase.Transcribing)
-        val t = withContext(Dispatchers.Default) { PodTalkCore.transcribePcm(modelPath, trimmed, threads = 4, stripFillers = true) }
+        val t1 = System.currentTimeMillis()
+        val t = withContext(Dispatchers.Default) { PodTalkCore.transcribePcm(modelPath, trimmed, threads = whisperThreads(), stripFillers = true) }
+        Log.i("Companion", "whisper took ${System.currentTimeMillis() - t1}ms: '${t.text}' fillers=${t.fillersRemoved.size}")
         return t to cleaned.enhanced
     }
 
@@ -72,11 +79,12 @@ class TalkCompanion(
         positionMs: Long,
         onPhase: (Phase) -> Unit,
         speak: Boolean = true,
+        questionEngine: String = "whisper.cpp",
     ): Exchange {
         onPhase(Phase.Thinking)
         val segments = transcript?.segments ?: emptyList()
         val ex = PodTalkCore.excerpt(segments, positionMs)
-        val qTurn = Turn("user", question, positionMs, ex.startMs, ex.endMs, ex.text.take(600), "whisper.cpp")
+        val qTurn = Turn("user", question, positionMs, ex.startMs, ex.endMs, ex.text.take(600), questionEngine)
         if (conversationId != null) runCatching { api.postTurn(conversationId, qTurn) }.onFailure { Log.w("Companion", "sync question failed: $it") }
 
         var engine = "claude"

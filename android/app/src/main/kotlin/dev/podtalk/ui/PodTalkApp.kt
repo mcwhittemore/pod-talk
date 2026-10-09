@@ -202,7 +202,10 @@ fun PlayerScreen(state: AppState) {
             if (listening) {
                 Spacer(Modifier.height(8.dp))
                 Box(Modifier.size((24 + (p.micLevel * 600).coerceAtMost(40f)).dp).clip(CircleShape).background(Color(0xFFDC2626).copy(alpha = 0.6f)))
-            } else if (busy) { Spacer(Modifier.height(8.dp)); LinearProgressIndicator(Modifier.fillMaxWidth(0.6f)) }
+            } else if (busy) {
+                // Deliberately static: an animated indicator keeps the render thread busy and starves whisper's threads on small devices.
+                Spacer(Modifier.height(8.dp)); Text("On-device · nothing leaves the phone", color = Muted, fontSize = 12.sp)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { showTyped = !showTyped }, enabled = !busy) { Text("Type instead") }
                 TextButton(onClick = { state.ask(clip = state.companion.sampleClip()) }, enabled = !busy) { Text("Mic pipeline self-test") }

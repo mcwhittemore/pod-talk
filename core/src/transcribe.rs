@@ -50,6 +50,9 @@ pub fn transcribe(
     params.set_split_on_word(true);
     params.set_suppress_blank(true);
     params.set_no_context(true);
+    // No temperature fallback: on-device we want bounded latency, not re-decodes.
+    params.set_temperature_inc(0.0);
+    params.set_entropy_thold(10.0);
     state.full(params, pcm).map_err(|e| format!("full: {e:?}"))?;
 
     let mut segments = Vec::new();

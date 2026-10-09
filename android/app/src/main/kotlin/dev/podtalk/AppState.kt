@@ -208,7 +208,7 @@ class AppState(private val app: Application) {
                 return@launch
             }
             player.update { it.copy(lastQuestionRaw = raw, lastEnhanced = enhanced, lastFillers = fillers, error = null) }
-            val ex = companion.answer(item, transcript, convo, question, pos, { ph -> player.update { it.copy(phase = ph) } })
+            val ex = companion.answer(item, transcript, convo, question, pos, { ph -> player.update { it.copy(phase = ph) } }, questionEngine = if (typed != null) "typed" else "whisper.cpp")
             player.update { it.copy(turns = it.turns + ex.question + ex.answer) }
         } catch (e: Exception) {
             Log.e("AppState", "ask failed", e)

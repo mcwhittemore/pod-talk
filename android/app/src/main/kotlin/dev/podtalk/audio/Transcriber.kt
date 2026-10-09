@@ -29,7 +29,7 @@ class Transcriber(private val http: OkHttpClient, private val store: Store) {
         if (modelReady(name)) return@withContext f
         // Dev convenience: a model pushed to /sdcard/Download is picked up without a network fetch.
         val sideloaded = File("/sdcard/Download/ggml-$name.bin")
-        if (sideloaded.exists() && sideloaded.length() > 1_000_000) { sideloaded.copyTo(f, overwrite = true); return@withContext f }
+        if (sideloaded.canRead() && sideloaded.length() > 1_000_000) { sideloaded.copyTo(f, overwrite = true); return@withContext f }
         val url = MODELS[name] ?: error("unknown model $name")
         val part = File(f.path + ".part")
         http.newCall(Request.Builder().url(url).build()).execute().use { r ->
@@ -45,7 +45,7 @@ class Transcriber(private val http: OkHttpClient, private val store: Store) {
 
     suspend fun transcribe(modelName: String, audio: File, onProgress: (Float) -> Unit): LocalTranscript = withContext(Dispatchers.Default) {
         val model = store.modelFile(modelName)
-        val threads = (Runtime.getRuntime().availableProcessors() - 1).coerceIn(2, 6)
+        val threads = (Runtime.getRuntime().availableProcessors() - 2).coerceIn(1, 6)
         val t = PodTalkCore.transcribeFile(model.path, audio.path, threads) { done, total -> if (total > 0) onProgress(done.toFloat() / total) }
         LocalTranscript(t.engine, t.durationMs, t.segments, t.fillersRemoved.size, t.processingMs, synced = false)
     }
