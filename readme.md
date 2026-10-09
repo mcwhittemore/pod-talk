@@ -45,15 +45,59 @@ cargo run --release --bin podtalk -- transcribe ~/models/ggml-tiny.en.bin some.m
 ./build-android.sh     # needs rustup target aarch64-linux-android, cargo-ndk, cmake, ninja, Android NDK
 ```
 
-Android (first `source env.sh` from the repo root; it points at the JDK in `~/jdk` and the SDK in `~/Library/Android/sdk`):
+## Build and load the app on your Pixel 8
+
+One-time setup on the phone:
+
+1. Settings → About phone → tap **Build number** seven times to enable Developer options.
+2. Settings → System → Developer options → turn on **USB debugging**.
+3. Plug the phone into the Mac with USB. Tap **Allow** on the "Allow USB debugging?" prompt (tick "Always allow from this computer").
+
+One-time setup on the Mac (already done on this machine; for a fresh Mac see the end of this section):
+
+```bash
+source env.sh          # JDK 17 in ~/jdk, Android SDK/NDK in ~/Library/Android/sdk, adb on PATH
+adb devices            # should list your phone as "device" (not "unauthorized")
+```
+
+Build the native core and the APK, then install:
 
 ```bash
 source env.sh
-cd android && ./gradlew assembleRelease -Ppodtalk.server=https://pod-talk-silk.vercel.app
-adb install app/build/outputs/apk/release/app-release.apk
+(cd core && ./build-android.sh)                       # Rust → android/app/src/main/jniLibs/arm64-v8a/
+cd android
+./gradlew assembleRelease -Ppodtalk.server=https://pod-talk-silk.vercel.app
+adb install -r app/build/outputs/apk/release/app-release.apk
+adb shell am start -n dev.podtalk/.MainActivity
 ```
 
-First launch asks for the server URL and token. The whisper model (`tiny.en`, 75 MB, or `base.en`) downloads from Hugging Face on first use; Clear's weights download the same way.
+The first Gradle build downloads Gradle and dependencies (a few minutes); later builds take about a minute. The release build is signed with the debug key, which is fine for sideloading.
+
+First launch: the server URL is pre-filled with production. Paste the API token (`cat ~/.podtalk-token` on this Mac, the same value as `POD_TALK_TOKEN` on Vercel), pick `tiny.en` (fast) or `base.en` (better), tap Save. On the queue screen tap **Download tiny.en** once; the whisper model comes from Hugging Face over the phone's network (75 MB). Desert Ant Clear downloads its weights the first time you tap **Ask or comment**. Grant the microphone permission when asked.
+
+To skip the model download, push it over USB (the app's dev shortcut copies it in):
+
+```bash
+adb push ~/models/ggml-tiny.en.bin /data/local/tmp/
+adb shell run-as dev.podtalk sh -c 'mkdir -p files/models && cp /data/local/tmp/ggml-tiny.en.bin files/models/'
+```
+
+Watching logs while you try it:
+
+```bash
+adb logcat -s podtalk-core Companion Enhancer AppState
+```
+
+Fresh Mac setup (what `env.sh` expects):
+
+```bash
+mkdir -p ~/jdk && cd ~/jdk && curl -L "https://api.adoptium.net/v3/binary/latest/17/ga/mac/aarch64/jdk/hotspot/normal/eclipse" | tar xz
+brew install --cask android-commandlinetools && brew install cmake ninja
+export JAVA_HOME=$(ls -d ~/jdk/jdk-17*/Contents/Home) ANDROID_HOME=~/Library/Android/sdk
+yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
+sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+rustup target add aarch64-linux-android && cargo install cargo-ndk
+```
 
 ## How the interrupt works
 
