@@ -58,6 +58,6 @@ Web: ![queue](web-queue.png) ![feed](web-feed-detail.png) ![conversation](web-co
 ## Not done / needs you
 
 - `ANTHROPIC_API_KEY` on Vercel for generated replies: `cd server && vercel env add ANTHROPIC_API_KEY production`. The fallback works without it.
-- Uploads need `BLOB_READ_WRITE_TOKEN`: create/connect a Blob store on the project in the Vercel dashboard (Storage → Create → Blob), which adds the token. Feeds + queue work without it.
-- Install on the Pixel 8: `adb install android/app/build/outputs/apk/release/app-release.apk` (also attached to the GitHub release), then enter the server URL (pre-filled with production) and the `POD_TALK_TOKEN` (kept in `~/.podtalk-token` on this Mac; it is the same value set on Vercel). Log in to the web app with the same token.
+- Uploads: Blob store `pod-talk-audio` created and linked (`BLOB_READ_WRITE_TOKEN` set, within the Pro plan's included usage). Real upload through the browser was not exercised by me.
+- Install on the Pixel 8: `adb install android/app/build/outputs/apk/release/app-release.apk` (a GitHub release upload was blocked by the session's permission policy, so install from the local build), then enter the server URL (pre-filled with production) and the `POD_TALK_TOKEN` (kept in `~/.podtalk-token` on this Mac; it is the same value set on Vercel). Log in to the web app with the same token.
 - A real-mic run was not possible on the emulator; the identical pipeline was exercised through the bundled clip ("Mic pipeline self-test" button, kept in the app on purpose).
