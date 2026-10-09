@@ -1,8 +1,12 @@
 import { Pool, type QueryResultRow } from "pg";
+import fs from "node:fs";
+import path from "node:path";
 
 declare global {
   // eslint-disable-next-line no-var
   var __podtalkPool: Pool | undefined;
+  // eslint-disable-next-line no-var
+  var __podtalkSchema: Promise<void> | undefined;
 }
 
 function createPool(): Pool {
@@ -21,10 +25,26 @@ export function getPool(): Pool {
   return globalThis.__podtalkPool;
 }
 
+/** Applies db/schema.sql once per process (idempotent CREATE IF NOT EXISTS), so a fresh Neon database works on the first request. */
+export function ensureSchema(): Promise<void> {
+  if (!globalThis.__podtalkSchema) {
+    globalThis.__podtalkSchema = (async () => {
+      const file = path.join(process.cwd(), "db", "schema.sql");
+      const sql = fs.readFileSync(file, "utf8");
+      await getPool().query(sql);
+    })().catch((err) => {
+      globalThis.__podtalkSchema = undefined;
+      throw err;
+    });
+  }
+  return globalThis.__podtalkSchema;
+}
+
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
+  await ensureSchema();
   const res = await getPool().query<T>(text, params);
   return res.rows;
 }
